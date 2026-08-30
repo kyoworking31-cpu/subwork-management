@@ -1,0 +1,12 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 960 },
+    { "file": "Card.dc.html", "x": 1560, "y": 0, "w": 440, "h": 820 },
+    { "file": "Mobile.dc.html", "x": 2120, "y": 0, "w": 390, "h": 844 }
+  ],
+  "annotations": [
+    { "id": "note-card-detail", "x": 1560, "y": -80, "w": 300, "text": "案件カードをクリックした時の詳細表示イメージ" },
+    { "id": "note-mobile-tabs", "x": 2120, "y": -100, "w": 320, "text": "スマホ幅ではステータス列をタブ切り替え方式に変更(横スクロール盤より片手操作しやすいため)" }
+  ],
+  "launch": { "view": "canvas" }
+}

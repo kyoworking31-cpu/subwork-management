@@ -1,0 +1,6 @@
+data/
+__pycache__/
+*.pyc
+design-mockup/subwork-kanban-mockup.html
+subwork-deploy.zip
+.claude/

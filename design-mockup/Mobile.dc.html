@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=Noto+Sans+JP:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #FAF7F2;
+      --surface: #FFFFFF;
+      --border: #E4DDD0;
+      --text-primary: #2B2723;
+      --text-secondary: #7A7367;
+      --text-tertiary: #A79F8F;
+      --accent: #3E7C74;
+      --accent-tint: #E4EFED;
+      --accent-dark: #2E5B55;
+      --cw-bg: #E8EEFB; --cw-text: #35548F;
+      --lc-bg: #FBEFE1; --lc-text: #9A5B14;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif; color: var(--text-primary); }
+    a { color: var(--accent); text-decoration: none; }
+    .heading { font-family: 'Zen Kaku Gothic New', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif; }
+  </style>
+</helmet>
+
+<div style="position:relative; width:390px; height:844px; background:var(--bg); display:flex; flex-direction:column; overflow:hidden;">
+
+  <!-- App bar -->
+  <div style="padding:18px 18px 12px; display:flex; align-items:center; justify-content:space-between;">
+    <div class="heading" style="font-size:17px; font-weight:700;">副業案件ボード</div>
+    <div style="width:32px; height:32px; border-radius:50%; background:var(--surface); border:1px solid var(--border); display:flex; align-items:center; justify-content:center;">
+      <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.5"/><path d="m15 15-2.7-2.7"/></svg>
+    </div>
+  </div>
+
+  <!-- Status tabs (switch between columns) -->
+  <div style="display:flex; gap:8px; padding:4px 18px 14px; overflow-x:auto;">
+    <div style="flex-shrink:0; display:flex; align-items:center; gap:6px; padding:8px 14px; border-radius:20px; border:1px solid var(--border); color:var(--text-secondary); font-size:13px; font-weight:600; background:var(--surface);">
+      応募中 <span style="color:var(--text-tertiary); font-weight:500;">2</span>
+    </div>
+    <div style="flex-shrink:0; display:flex; align-items:center; gap:6px; padding:8px 14px; border-radius:20px; border:1px solid var(--border); color:var(--text-secondary); font-size:13px; font-weight:600; background:var(--surface);">
+      面談予定 <span style="color:var(--text-tertiary); font-weight:500;">1</span>
+    </div>
+    <div style="flex-shrink:0; display:flex; align-items:center; gap:6px; padding:8px 14px; border-radius:20px; background:var(--accent); color:#fff; font-size:13px; font-weight:700;">
+      進行中 <span style="opacity:0.85; font-weight:600;">2</span>
+    </div>
+    <div style="flex-shrink:0; display:flex; align-items:center; gap:6px; padding:8px 14px; border-radius:20px; border:1px solid var(--border); color:var(--text-secondary); font-size:13px; font-weight:600; background:var(--surface);">
+      完了 <span style="color:var(--text-tertiary); font-weight:500;">1</span>
+    </div>
+  </div>
+
+  <!-- Card list for active tab (進行中) -->
+  <div style="flex:1; overflow-y:auto; padding:0 18px 18px; display:flex; flex-direction:column; gap:12px;">
+
+    <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px; display:flex; flex-direction:column; gap:8px;">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <span style="background:var(--cw-bg); color:var(--cw-text); font-size:11px; font-weight:600; padding:3px 8px; border-radius:5px;">CrowdWorks</span>
+        <span style="font-size:14px; font-weight:700; color:var(--accent-dark);">¥25,000</span>
+      </div>
+      <div style="font-size:15px; font-weight:700;">議事録作成</div>
+      <div style="display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--text-secondary);">
+        <svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="6" r="3"/><path d="M3.5 15c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/></svg>
+        □□PMO
+        <span style="color:var(--text-tertiary);">・</span>
+        <svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="13" height="12" rx="2"/><path d="M2.5 7h13M6 2v3M12 2v3"/></svg>
+        納期 9/10
+      </div>
+    </div>
+
+    <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px; display:flex; flex-direction:column; gap:8px;">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <span style="background:var(--lc-bg); color:var(--lc-text); font-size:11px; font-weight:600; padding:3px 8px; border-radius:5px;">ランサーズ</span>
+        <span style="font-size:14px; font-weight:700; color:var(--accent-dark);">¥18,000</span>
+      </div>
+      <div style="font-size:15px; font-weight:700;">ディズニーリゾート特集記事</div>
+      <div style="display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--text-secondary);">
+        <svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="6" r="3"/><path d="M3.5 15c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/></svg>
+        旅行メディア社
+        <span style="color:var(--text-tertiary);">・</span>
+        <svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="13" height="12" rx="2"/><path d="M2.5 7h13M6 2v3M12 2v3"/></svg>
+        納期 9/15
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Floating add button -->
+  <div style="position:absolute; right:20px; bottom:24px; width:52px; height:52px; border-radius:50%; background:var(--accent); box-shadow:0 6px 16px rgba(62,124,116,0.35); display:flex; align-items:center; justify-content:center;">
+    <svg width="20" height="20" viewBox="0 0 18 18" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M9 3v12M3 9h12"/></svg>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

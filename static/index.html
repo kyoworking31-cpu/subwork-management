@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>副業案件ボード</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=Noto+Sans+JP:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-title">
+      <h1>副業案件ボード</h1>
+      <p class="platforms-line">CrowdWorks・ランサーズ・ココナラ</p>
+    </div>
+    <div class="topbar-actions">
+      <div class="view-toggle" id="view-toggle">
+        <button class="view-tab active" data-view="board" type="button">ボード</button>
+        <button class="view-tab" data-view="calendar" type="button">カレンダー</button>
+        <button class="view-tab" data-view="tax" type="button">消費税計算</button>
+      </div>
+      <button id="btn-new-card" class="btn-primary">
+        <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 3v12M3 9h12"/></svg>
+        <span>新しい案件</span>
+      </button>
+    </div>
+  </header>
+
+  <div id="search-bar" class="search-bar">
+    <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.5"/><path d="m15 15-2.7-2.7"/></svg>
+    <input type="text" id="search-input" placeholder="案件ジャンル・クライアント名・メモで検索">
+    <button id="btn-clear-search" class="btn-icon hidden" aria-label="検索をクリア">
+      <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l10 10M14 4L4 14"/></svg>
+    </button>
+  </div>
+
+  <nav id="mobile-tabs" class="mobile-tabs"></nav>
+
+  <main id="board" class="board"></main>
+
+  <section id="calendar-view" class="calendar-view hidden">
+    <div class="calendar-toolbar">
+      <div class="calendar-nav">
+        <button id="cal-prev" class="btn-icon" aria-label="前の月">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3.5 5.5 9l5.5 5.5"/></svg>
+        </button>
+        <h2 id="cal-month-label">2026年8月</h2>
+        <button id="cal-next" class="btn-icon" aria-label="次の月">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5 12.5 9 7 14.5"/></svg>
+        </button>
+      </div>
+      <div class="calendar-toolbar-right">
+        <button id="cal-today" class="btn-ghost">今日</button>
+        <button id="btn-cal-settings" class="btn-icon" aria-label="カレンダー連携設定">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="2.4"/><path d="M9 2.6v1.6M9 13.8v1.6M15.4 9h-1.6M4.2 9H2.6M13.3 4.7l-1.1 1.1M5.8 12.1l-1.1 1.1M13.3 13.3l-1.1-1.1M5.8 5.8 4.7 4.7"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="cal-gcal-warning" class="cal-warning hidden"></div>
+
+    <div class="calendar-legend">
+      <span class="legend-item"><span class="dot dot-personal"></span>プライベート(Google)</span>
+      <span class="legend-item"><span class="dot dot-2"></span>面談</span>
+      <span class="legend-item"><span class="dot dot-3"></span>納期</span>
+    </div>
+
+    <div class="calendar-weekdays">
+      <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+    </div>
+    <div id="calendar-grid" class="calendar-grid"></div>
+  </section>
+
+  <section id="tax-view" class="tax-view hidden">
+    <div class="tax-panel">
+      <div class="tax-input-row">
+        <label for="tax-amount">金額</label>
+        <div class="tax-amount-wrap">
+          <span class="tax-yen">¥</span>
+          <input type="number" id="tax-amount" min="0" step="1" placeholder="10000" inputmode="numeric">
+        </div>
+      </div>
+
+      <div class="tax-option-row">
+        <span class="tax-option-label">入力した金額は</span>
+        <div class="pill-toggle" id="tax-mode-toggle">
+          <button class="pill active" data-mode="excluded" type="button">税抜金額</button>
+          <button class="pill" data-mode="included" type="button">税込金額</button>
+        </div>
+      </div>
+
+      <div class="tax-option-row">
+        <span class="tax-option-label">1円未満の端数</span>
+        <div class="pill-toggle" id="tax-round-toggle">
+          <button class="pill active" data-round="floor" type="button">切り捨て</button>
+          <button class="pill" data-round="round" type="button">四捨五入</button>
+          <button class="pill" data-round="ceil" type="button">切り上げ</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tax-table-wrap">
+      <table class="tax-table">
+        <thead>
+          <tr><th>税率</th><th>税抜金額</th><th>消費税額</th><th>税込金額</th></tr>
+        </thead>
+        <tbody id="tax-results"></tbody>
+      </table>
+    </div>
+
+    <div id="tax-note" class="cal-warning hidden"></div>
+  </section>
+
+  <div id="modal-backdrop" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modal-title">新しい案件</h2>
+        <button id="btn-close-modal" class="btn-icon" aria-label="閉じる">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l10 10M14 4L4 14"/></svg>
+        </button>
+      </div>
+
+      <form id="card-form" class="card-form">
+        <input type="hidden" id="field-id">
+
+        <div class="form-row">
+          <label for="field-platform">プラットフォーム</label>
+          <select id="field-platform" required>
+            <option value="CrowdWorks">CrowdWorks</option>
+            <option value="ランサーズ">ランサーズ</option>
+            <option value="ココナラ">ココナラ</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="field-status">ステータス</label>
+          <select id="field-status" required></select>
+        </div>
+
+        <div class="form-row">
+          <label for="field-genre">案件ジャンル</label>
+          <input type="text" id="field-genre" placeholder="例: Webライティング" required>
+        </div>
+
+        <div class="form-row two-col">
+          <div>
+            <label for="field-client-name">クライアント名</label>
+            <input type="text" id="field-client-name">
+          </div>
+          <div>
+            <label for="field-client-contact">連絡先</label>
+            <input type="text" id="field-client-contact" placeholder="メール・チャット等">
+          </div>
+        </div>
+
+        <div class="form-row three-col">
+          <div>
+            <label for="field-applied-date">応募日</label>
+            <input type="date" id="field-applied-date">
+          </div>
+          <div>
+            <label for="field-interview-at">面談日時</label>
+            <input type="datetime-local" id="field-interview-at">
+          </div>
+          <div>
+            <label for="field-due-date">納期</label>
+            <input type="date" id="field-due-date">
+          </div>
+        </div>
+
+        <div class="form-row two-col">
+          <div>
+            <label for="field-amount">報酬額 / 提案金額(円)</label>
+            <input type="number" id="field-amount" min="0" step="1">
+          </div>
+          <div>
+            <label for="field-url">元案件のURL</label>
+            <input type="url" id="field-url" placeholder="https://...">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label for="field-memo">メモ</label>
+          <textarea id="field-memo" rows="4"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="btn-delete-card" class="btn-danger hidden">削除</button>
+          <div class="modal-footer-right">
+            <button type="button" id="btn-cancel" class="btn-ghost">キャンセル</button>
+            <button type="submit" class="btn-primary">保存</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="settings-modal-backdrop" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>カレンダー連携設定</h2>
+        <button id="btn-close-settings" class="btn-icon" aria-label="閉じる">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l10 10M14 4L4 14"/></svg>
+        </button>
+      </div>
+      <form id="settings-form" class="card-form">
+        <div class="form-row">
+          <label for="field-gcal-url">GoogleカレンダーのiCal URL(非公開アドレス)</label>
+          <input type="url" id="field-gcal-url" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics">
+        </div>
+        <p class="settings-help">
+          Googleカレンダーの「設定」→取り込みたいカレンダー→「カレンダーの統合」の中にある「非公開URL(iCal形式)」をコピーして貼り付けてください。読み取り専用の連携で、このアプリからGoogleカレンダー側の予定を変更することはありません。
+        </p>
+        <div class="modal-footer">
+          <div></div>
+          <div class="modal-footer-right">
+            <button type="button" id="btn-cancel-settings" class="btn-ghost">キャンセル</button>
+            <button type="submit" class="btn-primary">保存</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="day-modal-backdrop" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="day-modal-title">予定</h2>
+        <button id="btn-close-day-modal" class="btn-icon" aria-label="閉じる">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l10 10M14 4L4 14"/></svg>
+        </button>
+      </div>
+      <div id="day-modal-list" class="day-event-list"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
