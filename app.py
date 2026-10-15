@@ -8,9 +8,6 @@ import time
 from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
 
-import icalendar
-import recurring_ical_events
-import requests
 from flask import Flask, Response, g, jsonify, request
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -309,6 +306,9 @@ def fetch_gcal_ics(url, force=False):
     )
     if fresh:
         return _gcal_cache["ics_text"], None
+    # カレンダー関連ライブラリは重いので、使うときだけ読み込む(Webアプリ起動を軽くするため)
+    import requests
+
     try:
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
@@ -379,6 +379,9 @@ def calendar_events():
         ics_text, gcal_error = fetch_gcal_ics(ics_url, force=force_refresh)
         if ics_text:
             try:
+                import icalendar
+                import recurring_ical_events
+
                 cal = icalendar.Calendar.from_ical(ics_text)
                 occurrences = recurring_ical_events.of(cal).between(start, end)
                 for occ in occurrences:
