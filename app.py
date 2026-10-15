@@ -18,7 +18,7 @@ DATA_DIR = BASE_DIR / "data"
 DB_PATH = DATA_DIR / "subwork.db"
 ARCHIVE_PATH = DATA_DIR / "deleted_archive.csv"
 
-STATUSES = ["応募中", "面談予定", "進行中", "納品・完了"]
+STATUSES = ["応募中", "面談予定", "進行中", "納品・完了", "保留"]
 PLATFORMS = ["CrowdWorks", "ランサーズ", "ココナラ"]
 DONE_STATUS = "納品・完了"
 AUTO_DELETE_AFTER_DAYS = 7

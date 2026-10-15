@@ -184,6 +184,7 @@ button { font-family: inherit; }
 .dot-2 { background: #C98A2E; }
 .dot-3 { background: var(--accent); }
 .dot-4 { background: #4F9D6E; }
+.dot-5 { background: #A79F8F; }
 
 .empty-hint {
   font-size: 12.5px;

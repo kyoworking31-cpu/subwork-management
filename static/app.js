@@ -1,5 +1,5 @@
 (() => {
-  const STATUS_DOT_CLASS = { 0: "dot-1", 1: "dot-2", 2: "dot-3", 3: "dot-4" };
+  const STATUS_DOT_CLASS = { 0: "dot-1", 1: "dot-2", 2: "dot-3", 3: "dot-4", 4: "dot-5" };
 
   const ICON_USER = '<svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="6" r="3"/><path d="M3.5 15c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/></svg>';
   const ICON_CALENDAR = '<svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="13" height="12" rx="2"/><path d="M2.5 7h13M6 2v3M12 2v3"/></svg>';
