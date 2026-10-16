@@ -3,7 +3,6 @@ import hmac
 import os
 import sqlite3
 import socket
-import threading
 import time
 from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
@@ -149,35 +148,39 @@ def archive_rows(rows):
             )
 
 
-def cleanup_old_completed_cards():
+def cleanup_old_completed_cards(db):
     """納品・完了のまま更新がなく一定日数経った案件を、CSVに退避してから削除する。"""
     cutoff = (datetime.now(timezone.utc) - timedelta(days=AUTO_DELETE_AFTER_DAYS)).isoformat()
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    rows = db.execute(
+        "SELECT * FROM cards WHERE status = ? AND updated_at < ?",
+        (DONE_STATUS, cutoff),
+    ).fetchall()
+    if not rows:
+        return 0
+    archive_rows(rows)
+    db.executemany("DELETE FROM cards WHERE id = ?", [(row["id"],) for row in rows])
+    db.commit()
+    return len(rows)
+
+
+_last_cleanup = 0.0
+
+
+def maybe_cleanup(db):
+    """ボード取得のついでに、一定間隔(6時間)ごとに自動削除を実行する。
+    バックグラウンドのスレッドは使わない(PythonAnywhereで途中停止してDBロックが残るのを避けるため)。"""
+    global _last_cleanup
+    now = time.time()
+    if now - _last_cleanup < CLEANUP_INTERVAL_SECONDS:
+        return
+    _last_cleanup = now
     try:
-        rows = conn.execute(
-            "SELECT * FROM cards WHERE status = ? AND updated_at < ?",
-            (DONE_STATUS, cutoff),
-        ).fetchall()
-        if not rows:
-            return 0
-        archive_rows(rows)
-        conn.executemany("DELETE FROM cards WHERE id = ?", [(row["id"],) for row in rows])
-        conn.commit()
-        return len(rows)
-    finally:
-        conn.close()
-
-
-def cleanup_loop():
-    while True:
-        try:
-            count = cleanup_old_completed_cards()
-            if count:
-                print(f"[自動削除] 納品・完了から{AUTO_DELETE_AFTER_DAYS}日経過した案件を{count}件アーカイブして削除しました")
-        except Exception as e:
-            print(f"[自動削除] エラー: {e}")
-        time.sleep(CLEANUP_INTERVAL_SECONDS)
+        count = cleanup_old_completed_cards(db)
+        if count:
+            print(f"[自動削除] 納品・完了から{AUTO_DELETE_AFTER_DAYS}日経過した案件を{count}件アーカイブして削除しました")
+    except Exception as e:
+        db.rollback()
+        print(f"[自動削除] エラー: {e}")
 
 
 @app.route("/")
@@ -193,6 +196,7 @@ def api_meta():
 @app.route("/api/cards", methods=["GET"])
 def list_cards():
     db = get_db()
+    maybe_cleanup(db)
     rows = db.execute("SELECT * FROM cards ORDER BY created_at ASC").fetchall()
     return jsonify([row_to_dict(r) for r in rows])
 
@@ -419,11 +423,10 @@ def get_lan_ip():
         s.close()
 
 
-# init_db()と自動削除スレッドは、ローカルで直接実行した場合(python app.py)だけでなく、
+# ローカルで直接実行した場合(python app.py)だけでなく、
 # PythonAnywhere等のWSGI経由でこのモジュールがimportされた場合にも実行されるよう、
 # モジュールレベルで呼び出す。
 init_db()
-threading.Thread(target=cleanup_loop, daemon=True).start()
 
 
 if __name__ == "__main__":
