@@ -108,6 +108,53 @@
     render();
   }
 
+  /* ---------- 面談日・納期が近い案件の強調 ---------- */
+  const URGENCY_EXCLUDED_STATUSES = ["納品・完了", "保留"];
+  const URGENCY_NEAR_DAYS = 7; // 薄い黄色で強調
+  const URGENCY_SOON_DAYS = 3; // オレンジで強調(今日・期限超過は赤)
+
+  function daysFromToday(dateStr) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr || "");
+    if (!m) return null;
+    const target = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return Math.round((target - today) / 86400000);
+  }
+
+  function urgencyOf(card) {
+    if (URGENCY_EXCLUDED_STATUSES.includes(card.status)) return null;
+    const candidates = [];
+
+    const iDays = daysFromToday(card.interview_at);
+    if (iDays !== null && iDays >= 0) {
+      const time = (card.interview_at.split("T")[1] || "").slice(0, 5);
+      const at = time ? ` ${time}` : "";
+      const label = iDays === 0 ? `今日 面談${at}` : iDays === 1 ? `明日 面談${at}` : `面談まで${iDays}日`;
+      candidates.push({ days: iDays, label });
+    }
+
+    const dDays = daysFromToday(card.due_date);
+    if (dDays !== null) {
+      const label = dDays < 0 ? `納期超過 ${-dDays}日`
+        : dDays === 0 ? "今日が納期"
+        : dDays === 1 ? "明日が納期"
+        : `納期まで${dDays}日`;
+      candidates.push({ days: dDays, label });
+    }
+
+    const hit = candidates
+      .filter((c) => c.days <= URGENCY_NEAR_DAYS)
+      .sort((a, b) => a.days - b.days)[0];
+    if (!hit) return null;
+
+    const level = hit.days < 0 ? "overdue"
+      : hit.days === 0 ? "today"
+      : hit.days <= URGENCY_SOON_DAYS ? "soon"
+      : "near";
+    return { level, label: hit.label };
+  }
+
   function contextualDateRow(card) {
     switch (card.status) {
       case "応募中":
@@ -142,9 +189,18 @@
       ? `<a class="card-link" href="${escapeAttr(card.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${ICON_LINK}元URL</a>`
       : "<span></span>";
 
+    const urgency = urgencyOf(card);
+    const urgencyClass = urgency ? ` urgent-${urgency.level}` : "";
+    const badge = urgency
+      ? `<span class="urgency-badge">${escapeHtml(urgency.label)}</span>`
+      : "";
+
     return `
-      <div class="card" draggable="true" data-id="${card.id}">
-        <span class="tag" data-platform="${escapeAttr(card.platform)}">${escapeHtml(card.platform)}</span>
+      <div class="card${urgencyClass}" draggable="true" data-id="${card.id}">
+        <div class="card-top">
+          <span class="tag" data-platform="${escapeAttr(card.platform)}">${escapeHtml(card.platform)}</span>
+          ${badge}
+        </div>
         <div class="card-title">${escapeHtml(card.genre)}</div>
         ${client}
         ${contextualDateRow(card)}
@@ -204,7 +260,12 @@
       .map((status) => {
         const count = grouped[status].length;
         const active = status === activeMobileStatus ? "active" : "";
-        return `<div class="mobile-tab ${active}" data-status="${escapeAttr(status)}">${status} <span class="n">${count}</span></div>`;
+        const hasAlert = grouped[status].some((c) => {
+          const u = urgencyOf(c);
+          return u && u.level !== "near";
+        });
+        const alertDot = hasAlert ? '<span class="tab-alert" title="期限が近い案件があります"></span>' : "";
+        return `<div class="mobile-tab ${active}" data-status="${escapeAttr(status)}">${status} <span class="n">${count}</span>${alertDot}</div>`;
       })
       .join("");
 

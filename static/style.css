@@ -222,6 +222,24 @@ button { font-family: inherit; }
 .card:hover { border-color: var(--accent); }
 .card.dragging { opacity: 0.4; }
 
+/* 面談日・納期が近い案件の強調(今日・期限超過=赤 / 3日以内=オレンジ / 7日以内=薄い黄色) */
+.card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.urgency-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+.card.urgent-overdue { border-color: #8F2B2B; background: #FBEEEE; box-shadow: 0 0 0 1px #8F2B2B; }
+.card.urgent-overdue .urgency-badge { background: #8F2B2B; color: #fff; }
+.card.urgent-today { border-color: var(--danger); background: #FDF3F2; box-shadow: 0 0 0 1px var(--danger); }
+.card.urgent-today .urgency-badge { background: var(--danger); color: #fff; }
+.card.urgent-soon { border-color: #D9822B; background: #FEF6EC; }
+.card.urgent-soon .urgency-badge { background: #D9822B; color: #fff; }
+.card.urgent-near { border-color: #E3C77A; background: #FFFBEF; }
+.card.urgent-near .urgency-badge { background: #F6E9BF; color: #7A5F10; }
+
 .tag {
   align-self: flex-start;
   font-size: 11px;
@@ -294,6 +312,13 @@ button { font-family: inherit; }
   cursor: pointer;
 }
 .mobile-tab .n { color: var(--text-tertiary); font-weight: 500; }
+.mobile-tab .tab-alert {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 1.5px #fff;
+}
 .mobile-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 .mobile-tab.active .n { color: rgba(255,255,255,0.85); }
 
