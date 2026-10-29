@@ -43,6 +43,7 @@
   const taxRoundToggle = document.getElementById("tax-round-toggle");
   const taxResultsEl = document.getElementById("tax-results");
   const taxNoteEl = document.getElementById("tax-note");
+  const incomeViewEl = document.getElementById("income-view");
 
   const f = {
     id: document.getElementById("field-id"),
@@ -432,12 +433,15 @@
     const isBoard = view === "board";
     const isCalendar = view === "calendar";
     const isTax = view === "tax";
+    const isIncome = view === "income";
     boardEl.classList.toggle("hidden", !isBoard);
     searchBarEl.classList.toggle("hidden", !isBoard);
     tabsEl.classList.toggle("hidden", !isBoard);
     calendarViewEl.classList.toggle("hidden", !isCalendar);
     taxViewEl.classList.toggle("hidden", !isTax);
+    incomeViewEl.classList.toggle("hidden", !isIncome);
     if (isCalendar) loadCalendarEvents();
+    if (isIncome) loadIncome();
   }
 
   viewToggleEl.querySelectorAll(".view-tab").forEach((tab) => {
@@ -714,6 +718,390 @@
     taxRoundMode = btn.dataset.round;
     taxRoundToggle.querySelectorAll(".pill").forEach((p) => p.classList.toggle("active", p === btn));
     renderTaxResults();
+  });
+
+  /* ---------- 収入台帳(クラウドワークス報酬明細CSVの取り込み・月別集計) ---------- */
+  let incomeRecords = [];
+  let incomeFilterMonth = null;
+  let incomeBannerTimer = null;
+  let incomeClearArmed = false;
+  let incomeClearTimer = null;
+  const $income = (id) => document.getElementById("income-" + id);
+
+  function yen(n) {
+    return "¥" + Math.round(n || 0).toLocaleString("ja-JP");
+  }
+  function incomeFmtDate(iso) {
+    const p = (iso || "").split("-");
+    return p.length < 3 ? iso || "—" : parseInt(p[1], 10) + "/" + parseInt(p[2], 10);
+  }
+  function incomeFmtMonth(key) {
+    const p = key.split("-");
+    return p[0] + "年" + parseInt(p[1], 10) + "月";
+  }
+
+  function showIncomeBanner(msg, kind) {
+    const el = $income("banner");
+    el.textContent = msg;
+    el.className = "income-banner " + (kind === "err" ? "err" : "ok");
+    clearTimeout(incomeBannerTimer);
+    incomeBannerTimer = setTimeout(() => el.classList.add("hidden"), 6000);
+  }
+
+  function parseCsvText(text) {
+    const rows = [];
+    let cur = [];
+    let field = "";
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i++; } else { inQuotes = false; }
+        } else {
+          field += c;
+        }
+      } else if (c === '"') {
+        inQuotes = true;
+      } else if (c === ",") {
+        cur.push(field); field = "";
+      } else if (c === "\n" || c === "\r") {
+        if (c === "\r" && text[i + 1] === "\n") i++;
+        cur.push(field); field = "";
+        if (cur.length > 1 || cur[0] !== "") rows.push(cur);
+        cur = [];
+      } else {
+        field += c;
+      }
+    }
+    if (field !== "" || cur.length) { cur.push(field); rows.push(cur); }
+    return rows;
+  }
+
+  function decodeCsvBuffer(buf) {
+    let text = new TextDecoder("utf-8").decode(buf);
+    if (text.indexOf("�") !== -1 || text.indexOf("報酬ID") === -1) {
+      try {
+        const alt = new TextDecoder("shift-jis").decode(buf);
+        if (alt.indexOf("報酬ID") !== -1) text = alt;
+      } catch (e) { /* shift-jis非対応のブラウザ */ }
+    }
+    return text;
+  }
+
+  async function readIncomeCsv(file) {
+    const rows = parseCsvText(decodeCsvBuffer(await file.arrayBuffer()));
+    if (!rows.length || !rows[0].some((h) => h.indexOf("報酬ID") !== -1)) {
+      throw new Error("format");
+    }
+    const out = [];
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || r.length < 9 || !r[0] || !r[0].trim()) continue;
+      out.push({
+        id: r[0].trim(),
+        name: (r[1] || "").trim(),
+        contract: parseFloat(r[2]) || 0,
+        withholding: parseFloat(r[4]) || 0,
+        sysfee: parseFloat(r[5]) || 0,
+        net: parseFloat(r[7]) || 0,
+        date: (r[8] || "").trim(),
+      });
+    }
+    return out;
+  }
+
+  async function loadIncome() {
+    try {
+      incomeRecords = await api("/api/income");
+    } catch (err) {
+      showIncomeBanner("収入台帳の読み込みに失敗しました: " + err.message, "err");
+      incomeRecords = [];
+    }
+    renderIncome();
+  }
+
+  function incomeMonthly() {
+    const map = {};
+    incomeRecords.forEach((r) => {
+      const k = (r.date || "").slice(0, 7);
+      (map[k] = map[k] || { month: k, net: 0, count: 0 });
+      map[k].net += r.net || 0;
+      map[k].count++;
+    });
+    return Object.keys(map).sort().map((k) => map[k]);
+  }
+
+  function renderIncome() {
+    const shown = incomeFilterMonth
+      ? incomeRecords.filter((r) => (r.date || "").slice(0, 7) === incomeFilterMonth)
+      : incomeRecords;
+
+    let net = 0, contract = 0, sysfee = 0, withholding = 0, manualNet = 0;
+    const days = {};
+    shown.forEach((r) => {
+      net += r.net || 0;
+      if (r.source === "manual") manualNet += r.net || 0;
+      contract += r.contract || 0;
+      sysfee += r.sysfee || 0;
+      withholding += r.withholding || 0;
+      if (r.date) days[r.date] = true;
+    });
+
+    $income("balance-label").textContent = incomeFilterMonth
+      ? "手取り合計(" + incomeFmtMonth(incomeFilterMonth) + ")"
+      : "手取り合計(全期間)";
+    $income("balance-value").textContent = yen(net);
+    $income("balance-sub").textContent = contract > 0 && manualNet > 0
+      ? "CSV分の契約金額 " + yen(contract) + " / 手入力の記帳 " + yen(manualNet)
+      : contract > 0
+        ? "契約金額 " + yen(contract) + " のうち手取り"
+        : shown.length ? "手入力の記帳のみ" : "";
+    $income("tile-sysfee").textContent = yen(sysfee);
+    $income("tile-withholding").textContent = yen(withholding);
+    $income("tile-count").textContent = shown.length.toLocaleString("ja-JP") + "件";
+    $income("tile-days").textContent = Object.keys(days).length.toLocaleString("ja-JP") + "日";
+
+    const pill = $income("filter-pill");
+    pill.classList.toggle("hidden", !incomeFilterMonth);
+    if (incomeFilterMonth) $income("filter-pill-text").textContent = incomeFmtMonth(incomeFilterMonth);
+
+    renderIncomeTable(shown);
+    renderIncomeChart();
+    $income("foot-note").textContent = "記帳 " + incomeRecords.length.toLocaleString("ja-JP") + "件";
+    $income("table-count").textContent = "(" + shown.length.toLocaleString("ja-JP") + "件)";
+  }
+
+  function renderIncomeTable(records) {
+    const tbody = $income("tbody");
+    tbody.innerHTML = "";
+    if (!records.length) {
+      const tr = document.createElement("tr");
+      tr.className = "income-empty";
+      const td = document.createElement("td");
+      td.colSpan = 4;
+      td.textContent = "記帳がありません。CSVを取り込むか、手入力で追加してください。";
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+      return;
+    }
+    const sorted = records.slice().sort((a, b) =>
+      a.date === b.date ? String(b.id).localeCompare(String(a.id)) : String(b.date).localeCompare(String(a.date)));
+    sorted.forEach((r) => {
+      const tr = document.createElement("tr");
+      const tdDate = document.createElement("td");
+      tdDate.textContent = incomeFmtDate(r.date);
+      tr.appendChild(tdDate);
+
+      const tdName = document.createElement("td");
+      tdName.className = "name-cell";
+      const chip = document.createElement("span");
+      chip.className = "income-chip";
+      chip.textContent = r.source === "manual" ? "手入力" : "CSV";
+      tdName.appendChild(chip);
+      tdName.appendChild(document.createTextNode(r.name || "(無題)"));
+      tr.appendChild(tdName);
+
+      const tdNet = document.createElement("td");
+      tdNet.className = "net-cell";
+      tdNet.textContent = yen(r.net);
+      tr.appendChild(tdNet);
+
+      const tdDel = document.createElement("td");
+      const del = document.createElement("button");
+      del.className = "income-del";
+      del.type = "button";
+      del.textContent = "✕";
+      del.setAttribute("aria-label", "削除");
+      del.addEventListener("click", async () => {
+        try {
+          await api("/api/income/" + encodeURIComponent(r.id), { method: "DELETE" });
+          await loadIncome();
+        } catch (err) {
+          showIncomeBanner(err.message, "err");
+        }
+      });
+      tdDel.appendChild(del);
+      tr.appendChild(tdDel);
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderIncomeChart() {
+    const monthly = incomeMonthly();
+    const svg = $income("chart");
+    const tooltip = $income("tooltip");
+    const wrap = svg.parentElement;
+    const ns = "http://www.w3.org/2000/svg";
+
+    const barSlot = 56, leftPad = 60, rightPad = 12, topPad = 16, bottomPad = 26, chartHeight = 180;
+    const width = leftPad + rightPad + Math.max(monthly.length, 1) * barSlot;
+    const height = topPad + chartHeight + bottomPad;
+    svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+    svg.innerHTML = "";
+
+    const text = (x, y, anchor, str) => {
+      const t = document.createElementNS(ns, "text");
+      t.setAttribute("x", x); t.setAttribute("y", y);
+      t.setAttribute("text-anchor", anchor);
+      t.setAttribute("class", "axis-label");
+      t.textContent = str;
+      svg.appendChild(t);
+    };
+
+    if (!monthly.length) {
+      text(width / 2, height / 2, "middle", "データがありません");
+      return;
+    }
+
+    const maxVal = Math.max(1, ...monthly.map((d) => d.net));
+    const niceMax = Math.ceil(maxVal / 500) * 500 || 500;
+    const steps = 4;
+    for (let i = 0; i <= steps; i++) {
+      const v = (niceMax / steps) * i;
+      const y = topPad + (chartHeight - (v / niceMax) * chartHeight);
+      const line = document.createElementNS(ns, "line");
+      line.setAttribute("x1", leftPad); line.setAttribute("x2", width - rightPad);
+      line.setAttribute("y1", y); line.setAttribute("y2", y);
+      line.setAttribute("class", i === 0 ? "baseline-line" : "gridline");
+      svg.appendChild(line);
+      text(leftPad - 8, y + 3, "end", yen(v));
+    }
+
+    const barWidth = Math.min(28, barSlot - 16);
+    monthly.forEach((d, idx) => {
+      const slotX = leftPad + idx * barSlot;
+      const barX = slotX + (barSlot - barWidth) / 2;
+      const barH = (d.net / niceMax) * chartHeight;
+      const barY = topPad + chartHeight - barH;
+
+      const rect = document.createElementNS(ns, "rect");
+      rect.setAttribute("x", barX);
+      rect.setAttribute("y", d.net > 0 ? barY : topPad + chartHeight - 1);
+      rect.setAttribute("width", barWidth);
+      rect.setAttribute("height", d.net > 0 ? Math.max(barH, 2) : 1);
+      rect.setAttribute("rx", 4);
+      rect.setAttribute("class", "bar" + (incomeFilterMonth === d.month ? " active" : ""));
+
+      const hit = document.createElementNS(ns, "rect");
+      hit.setAttribute("x", slotX); hit.setAttribute("y", topPad);
+      hit.setAttribute("width", barSlot); hit.setAttribute("height", chartHeight);
+      hit.setAttribute("fill", "transparent");
+      hit.style.cursor = "pointer";
+
+      const showTip = () => {
+        $income("tt-date").textContent = incomeFmtMonth(d.month);
+        $income("tt-val").textContent = yen(d.net);
+        $income("tt-sub").textContent = d.count + "件の記帳";
+        tooltip.classList.add("show");
+        const wrapRect = wrap.getBoundingClientRect();
+        const svgRect = svg.getBoundingClientRect();
+        tooltip.style.left = ((slotX + barSlot / 2) * (svgRect.width / width) + (svgRect.left - wrapRect.left) + wrap.scrollLeft) + "px";
+        tooltip.style.top = (barY * (svgRect.height / height)) + "px";
+      };
+      hit.addEventListener("pointerenter", showTip);
+      hit.addEventListener("pointermove", showTip);
+      hit.addEventListener("pointerleave", () => tooltip.classList.remove("show"));
+      hit.addEventListener("click", () => {
+        incomeFilterMonth = incomeFilterMonth === d.month ? null : d.month;
+        renderIncome();
+      });
+
+      svg.appendChild(rect);
+      svg.appendChild(hit);
+      text(slotX + barSlot / 2, topPad + chartHeight + 16, "middle", d.month.slice(2).replace("-", "/"));
+    });
+  }
+
+  $income("csv-input").addEventListener("change", async (e) => {
+    const input = e.target;
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      const records = await readIncomeCsv(file);
+      const res = await api("/api/income/import", { method: "POST", body: JSON.stringify({ records }) });
+      await loadIncome();
+      const dup = res.skipped > 0 ? "(" + res.skipped + "件は重複のためスキップ)" : "";
+      const bad = res.invalid > 0 ? "(" + res.invalid + "件は日付などが不正なため取り込めませんでした)" : "";
+      showIncomeBanner(
+        res.added === 0 && res.skipped > 0 ? "取り込み済みでした" + dup : res.added + "件を記帳しました" + dup + bad,
+        "ok"
+      );
+    } catch (err) {
+      showIncomeBanner(
+        err.message === "format"
+          ? "CSVを読み込めませんでした。クラウドワークスの報酬明細CSVか確認してください。"
+          : "取り込みに失敗しました: " + err.message,
+        "err"
+      );
+    } finally {
+      input.value = "";
+    }
+  });
+
+  $income("toggle-manual").addEventListener("click", () => {
+    const form = $income("manual-form");
+    form.classList.toggle("hidden");
+    if (!form.classList.contains("hidden")) {
+      const d = $income("m-date");
+      if (!d.value) {
+        const now = new Date();
+        d.value = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
+      }
+      $income("m-amount").focus();
+    }
+  });
+  $income("cancel-manual").addEventListener("click", () => $income("manual-form").classList.add("hidden"));
+
+  $income("manual-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await api("/api/income", {
+        method: "POST",
+        body: JSON.stringify({
+          date: $income("m-date").value,
+          net: $income("m-amount").value,
+          name: $income("m-memo").value,
+        }),
+      });
+      $income("m-amount").value = "";
+      $income("m-memo").value = "";
+      showIncomeBanner("記帳しました", "ok");
+      await loadIncome();
+    } catch (err) {
+      showIncomeBanner(err.message, "err");
+    }
+  });
+
+  $income("filter-pill").addEventListener("click", () => {
+    incomeFilterMonth = null;
+    renderIncome();
+  });
+
+  const incomeClearBtn = $income("clear");
+  incomeClearBtn.addEventListener("click", async () => {
+    if (!incomeClearArmed) {
+      incomeClearArmed = true;
+      incomeClearBtn.textContent = "もう一度クリックで完全に削除";
+      incomeClearTimer = setTimeout(() => {
+        incomeClearArmed = false;
+        incomeClearBtn.textContent = "全データを削除";
+      }, 4000);
+      return;
+    }
+    clearTimeout(incomeClearTimer);
+    incomeClearArmed = false;
+    incomeClearBtn.textContent = "全データを削除";
+    try {
+      await api("/api/income", { method: "DELETE" });
+      incomeFilterMonth = null;
+      showIncomeBanner("全ての記帳を削除しました", "ok");
+      await loadIncome();
+    } catch (err) {
+      showIncomeBanner(err.message, "err");
+    }
   });
 
   function escapeHtml(str) {

@@ -576,6 +576,146 @@ button { font-family: inherit; }
 #tax-note { margin-top: 16px; margin-bottom: 0; line-height: 1.7; }
 #tax-note .tax-note-line { margin-top: 4px; }
 
+/* ---------- Income ledger ---------- */
+.income-view { padding: 24px 28px 60px; max-width: 760px; }
+
+.income-basis { font-size: 12.5px; color: var(--text-secondary); line-height: 1.7; margin: 0 0 18px; }
+.income-basis strong { color: var(--text-primary); }
+
+.income-balance {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 22px;
+  margin-bottom: 14px;
+}
+.income-balance-label { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 4px; }
+.income-balance-value { font-size: 38px; font-weight: 700; color: var(--accent-dark); letter-spacing: -0.01em; }
+.income-balance-sub { margin-top: 6px; font-size: 12px; color: var(--text-tertiary); }
+
+.income-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 26px;
+}
+.income-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.income-tile-label { font-size: 11px; color: var(--text-tertiary); margin-bottom: 4px; }
+.income-tile-value { font-size: 16px; font-weight: 700; }
+
+.income-section { margin-bottom: 28px; }
+.income-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.income-section-title { font-size: 15px; font-weight: 700; margin: 0 0 12px; }
+.income-count { font-size: 11px; color: var(--text-tertiary); font-weight: 400; margin-left: 8px; }
+
+.income-toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.income-file-btn { position: relative; overflow: hidden; cursor: pointer; }
+.income-file-btn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+.income-banner { font-size: 12.5px; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; line-height: 1.6; }
+.income-banner.ok { background: var(--accent-tint); color: var(--accent-dark); }
+.income-banner.err { background: #FBEEEE; color: var(--danger); }
+
+.income-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  background: var(--column-bg);
+  border-radius: 10px;
+  padding: 14px;
+}
+.income-form.hidden { display: none; }
+.income-field { display: flex; flex-direction: column; gap: 4px; }
+.income-field label { font-size: 11px; color: var(--text-secondary); font-weight: 600; }
+.income-field input {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text-primary);
+  min-width: 0;
+}
+.income-field input:focus { outline: none; border-color: var(--accent); }
+.income-field-grow { flex: 1; min-width: 160px; }
+
+.income-chart-wrap { position: relative; overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 8px 4px 4px; }
+.income-chart { display: block; }
+.income-chart .bar { fill: var(--accent); cursor: pointer; }
+.income-chart .bar:hover, .income-chart .bar.active { fill: var(--accent-dark); }
+.income-chart .axis-label { fill: var(--text-tertiary); font-size: 10px; }
+.income-chart .gridline { stroke: var(--border); stroke-width: 1; }
+.income-chart .baseline-line { stroke: var(--text-tertiary); stroke-width: 1; }
+
+.income-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--column-bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+.income-filter-pill.hidden { display: none; }
+
+.income-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--text-primary);
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 11px;
+  font-size: 12px;
+  opacity: 0;
+  transform: translate(-50%, calc(-100% - 10px));
+  transition: opacity 0.1s ease;
+  white-space: nowrap;
+  z-index: 5;
+}
+.income-tooltip.show { opacity: 1; }
+.income-tooltip .tt-date { color: rgba(255,255,255,0.7); font-size: 11px; margin-bottom: 2px; }
+.income-tooltip .tt-val { font-weight: 700; font-size: 14px; }
+.income-tooltip .tt-sub { color: rgba(255,255,255,0.6); font-size: 10.5px; margin-top: 2px; }
+
+.income-table-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.income-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.income-table th {
+  text-align: right;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding: 10px 12px;
+  background: var(--column-bg);
+  white-space: nowrap;
+}
+.income-table th:first-child, .income-table th:nth-child(2) { text-align: left; }
+.income-table td { padding: 10px 12px; border-top: 1px solid var(--border); text-align: right; vertical-align: top; }
+.income-table td:first-child { text-align: left; color: var(--text-secondary); white-space: nowrap; }
+.income-table td.name-cell { text-align: left; white-space: normal; line-height: 1.5; max-width: 320px; }
+.income-table td.net-cell { font-weight: 700; color: var(--accent-dark); white-space: nowrap; }
+.income-chip {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+.income-del { background: none; border: none; color: var(--text-tertiary); cursor: pointer; font-size: 13px; padding: 2px 6px; border-radius: 4px; }
+.income-del:hover { color: var(--danger); background: #FBEEEE; }
+.income-empty td { text-align: center !important; color: var(--text-tertiary); padding: 28px 12px; }
+
+.income-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--text-tertiary); }
+
 /* ---------- Toast ---------- */
 .toast {
   position: fixed;
@@ -625,4 +765,14 @@ button { font-family: inherit; }
   .tax-view { padding: 16px 16px 40px; }
   .tax-panel { padding: 16px; gap: 14px; }
   .tax-table th, .tax-table td { padding: 10px 8px; font-size: 12.5px; }
+
+  .topbar-actions { gap: 8px; }
+  .view-toggle { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .view-toggle::-webkit-scrollbar { display: none; }
+  .view-tab { padding: 6px 6px; font-size: 12px; flex-shrink: 0; }
+  .btn-primary { flex-shrink: 0; }
+
+  .income-view { padding: 16px 16px 40px; }
+  .income-balance-value { font-size: 30px; }
+  .income-tiles { grid-template-columns: repeat(2, 1fr); }
 }

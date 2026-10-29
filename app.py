@@ -4,6 +4,7 @@ import os
 import sqlite3
 import socket
 import time
+import uuid
 from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
 
@@ -96,6 +97,21 @@ def init_db():
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS income (
+            id TEXT PRIMARY KEY,
+            source TEXT NOT NULL,
+            name TEXT NOT NULL DEFAULT '',
+            contract REAL,
+            withholding REAL,
+            sysfee REAL,
+            net REAL NOT NULL,
+            date TEXT NOT NULL,
+            created_at TEXT NOT NULL
         )
         """
     )
@@ -279,6 +295,119 @@ def update_card(card_id):
 def delete_card(card_id):
     db = get_db()
     db.execute("DELETE FROM cards WHERE id = ?", (card_id,))
+    db.commit()
+    return "", 204
+
+
+# ---------- 収入台帳 ----------
+
+INCOME_COLUMNS = ["id", "source", "name", "contract", "withholding", "sysfee", "net", "date"]
+
+
+def _num_or_none(value):
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        raise ValueError("number")
+
+
+def normalize_income(rec, source):
+    """入力1件を検証して整形する。不正なら ValueError。"""
+    rid = str(rec.get("id") or "").strip()
+    if not rid:
+        raise ValueError("id")
+    day = str(rec.get("date") or "").strip().replace("/", "-")
+    try:
+        day = date.fromisoformat(day[:10]).isoformat()
+    except ValueError:
+        raise ValueError("date")
+    net = _num_or_none(rec.get("net"))
+    if net is None or net < 0:
+        raise ValueError("net")
+    return {
+        "id": rid,
+        "source": source,
+        "name": str(rec.get("name") or "").strip()[:500],
+        "contract": _num_or_none(rec.get("contract")),
+        "withholding": _num_or_none(rec.get("withholding")),
+        "sysfee": _num_or_none(rec.get("sysfee")),
+        "net": net,
+        "date": day,
+    }
+
+
+def insert_income(db, rec):
+    cur = db.execute(
+        "INSERT OR IGNORE INTO income (id, source, name, contract, withholding, sysfee, net, date, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [rec[c] for c in INCOME_COLUMNS] + [now_iso()],
+    )
+    return cur.rowcount
+
+
+@app.route("/api/income", methods=["GET"])
+def list_income():
+    db = get_db()
+    rows = db.execute("SELECT * FROM income ORDER BY date DESC, id DESC").fetchall()
+    return jsonify([row_to_dict(r) for r in rows])
+
+
+@app.route("/api/income/import", methods=["POST"])
+def import_income():
+    """クラウドワークスの報酬明細CSV(ブラウザで解析済み)を取り込む。報酬IDが同じものはスキップ。"""
+    data = request.get_json(force=True) or {}
+    records = data.get("records")
+    if not isinstance(records, list):
+        return jsonify({"error": "取り込むデータがありません"}), 400
+    db = get_db()
+    added = skipped = invalid = 0
+    for rec in records:
+        try:
+            clean = normalize_income(rec, "csv")
+        except (ValueError, AttributeError):
+            invalid += 1
+            continue
+        if insert_income(db, clean):
+            added += 1
+        else:
+            skipped += 1
+    db.commit()
+    return jsonify({"added": added, "skipped": skipped, "invalid": invalid})
+
+
+@app.route("/api/income", methods=["POST"])
+def create_income():
+    data = request.get_json(force=True) or {}
+    rec = {
+        "id": "m_" + uuid.uuid4().hex[:12],
+        "name": (data.get("name") or "").strip() or "(手入力)",
+        "net": data.get("net"),
+        "date": data.get("date"),
+    }
+    try:
+        clean = normalize_income(rec, "manual")
+    except ValueError:
+        return jsonify({"error": "確定日と金額を正しく入力してください"}), 400
+    db = get_db()
+    insert_income(db, clean)
+    db.commit()
+    return jsonify(clean), 201
+
+
+@app.route("/api/income/<income_id>", methods=["DELETE"])
+def delete_income(income_id):
+    db = get_db()
+    db.execute("DELETE FROM income WHERE id = ?", (income_id,))
+    db.commit()
+    return "", 204
+
+
+@app.route("/api/income", methods=["DELETE"])
+def clear_income():
+    db = get_db()
+    db.execute("DELETE FROM income")
     db.commit()
     return "", 204
 

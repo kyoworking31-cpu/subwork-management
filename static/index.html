@@ -21,6 +21,7 @@
         <button class="view-tab active" data-view="board" type="button">ボード</button>
         <button class="view-tab" data-view="calendar" type="button">カレンダー</button>
         <button class="view-tab" data-view="tax" type="button">消費税計算</button>
+        <button class="view-tab" data-view="income" type="button">収入台帳</button>
       </div>
       <button id="btn-new-card" class="btn-primary">
         <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 3v12M3 9h12"/></svg>
@@ -112,6 +113,87 @@
     </div>
 
     <div id="tax-note" class="cal-warning hidden"></div>
+  </section>
+
+  <section id="income-view" class="income-view hidden">
+    <p class="income-basis">
+      <strong>集計基準:</strong> クラウドワークスの報酬明細CSVには実際の振込日が含まれないため、<strong>案件の確定日</strong>を入金タイミングの代わりに集計しています。
+    </p>
+
+    <div class="income-balance">
+      <div class="income-balance-label" id="income-balance-label">手取り合計(全期間)</div>
+      <div class="income-balance-value" id="income-balance-value">¥0</div>
+      <div class="income-balance-sub" id="income-balance-sub"></div>
+    </div>
+
+    <div class="income-tiles">
+      <div class="income-tile"><div class="income-tile-label">システム利用料</div><div class="income-tile-value" id="income-tile-sysfee">¥0</div></div>
+      <div class="income-tile"><div class="income-tile-label">源泉徴収税額</div><div class="income-tile-value" id="income-tile-withholding">¥0</div></div>
+      <div class="income-tile"><div class="income-tile-label">記帳件数</div><div class="income-tile-value" id="income-tile-count">0件</div></div>
+      <div class="income-tile"><div class="income-tile-label">記帳日数</div><div class="income-tile-value" id="income-tile-days">0日</div></div>
+    </div>
+
+    <div class="income-section">
+      <h3 class="income-section-title">記帳</h3>
+      <div id="income-banner" class="income-banner hidden"></div>
+      <div class="income-toolbar">
+        <label class="btn-primary income-file-btn">
+          CSVを取り込む
+          <input type="file" id="income-csv-input" accept=".csv,text/csv">
+        </label>
+        <button class="btn-ghost" id="income-toggle-manual" type="button">+ 手入力で追加</button>
+      </div>
+      <form class="income-form hidden" id="income-manual-form">
+        <div class="income-field">
+          <label for="income-m-date">確定日</label>
+          <input type="date" id="income-m-date" required>
+        </div>
+        <div class="income-field">
+          <label for="income-m-amount">手取り額(円)</label>
+          <input type="number" id="income-m-amount" inputmode="numeric" min="0" step="1" required>
+        </div>
+        <div class="income-field income-field-grow">
+          <label for="income-m-memo">メモ(任意)</label>
+          <input type="text" id="income-m-memo" placeholder="案件名など">
+        </div>
+        <button class="btn-primary" type="submit">記帳する</button>
+        <button class="btn-ghost" type="button" id="income-cancel-manual">キャンセル</button>
+      </form>
+    </div>
+
+    <div class="income-section">
+      <div class="income-section-head">
+        <h3 class="income-section-title">月別 手取り推移</h3>
+        <button class="income-filter-pill hidden" id="income-filter-pill" type="button">
+          <span id="income-filter-pill-text"></span> ✕
+        </button>
+      </div>
+      <div class="income-chart-wrap">
+        <svg class="income-chart" id="income-chart"></svg>
+        <div class="income-tooltip" id="income-tooltip">
+          <div class="tt-date" id="income-tt-date"></div>
+          <div class="tt-val" id="income-tt-val"></div>
+          <div class="tt-sub" id="income-tt-sub"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="income-section">
+      <h3 class="income-section-title">記帳一覧<span class="income-count" id="income-table-count"></span></h3>
+      <div class="income-table-scroll">
+        <table class="income-table">
+          <thead>
+            <tr><th>確定日</th><th>案件名 / メモ</th><th>手取り</th><th></th></tr>
+          </thead>
+          <tbody id="income-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="income-foot">
+      <span id="income-foot-note">記帳 0件</span>
+      <button class="btn-danger" id="income-clear" type="button">全データを削除</button>
+    </div>
   </section>
 
   <div id="modal-backdrop" class="modal-backdrop hidden">
