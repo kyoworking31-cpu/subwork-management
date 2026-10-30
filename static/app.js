@@ -156,6 +156,33 @@
     return { level, label: hit.label };
   }
 
+  /* ---------- 「返事待ち」の強調(応募中のまま動きがない案件) ---------- */
+  const WAITING_NOTICE_DAYS = 3; // この日数以上動きがなければ薄い青で表示
+  const WAITING_LONG_DAYS = 7;   // この日数以上なら濃い青で表示(フォロー連絡の検討)
+
+  function daysSinceTimestamp(ts) {
+    const d = new Date(ts);
+    if (isNaN(d)) return null;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    return Math.round((today - day) / 86400000);
+  }
+
+  // 応募日と最終更新日のうち新しい方からの経過日数。メモ更新などの動きがあれば数え直す。
+  function waitingOf(card) {
+    if (card.status !== "応募中") return null;
+    const candidates = [];
+    const applied = daysFromToday(card.applied_date);
+    if (applied !== null) candidates.push(-applied);
+    const updated = daysSinceTimestamp(card.updated_at);
+    if (updated !== null) candidates.push(updated);
+    if (!candidates.length) return null;
+    const days = Math.max(0, Math.min(...candidates));
+    if (days < WAITING_NOTICE_DAYS) return null;
+    return { level: days >= WAITING_LONG_DAYS ? "long" : "notice", days };
+  }
+
   function contextualDateRow(card) {
     switch (card.status) {
       case "応募中":
@@ -190,11 +217,15 @@
       ? `<a class="card-link" href="${escapeAttr(card.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${ICON_LINK}元URL</a>`
       : "<span></span>";
 
+    // 面談・納期の強調を優先し、なければ「返事待ち」を表示する
     const urgency = urgencyOf(card);
-    const urgencyClass = urgency ? ` urgent-${urgency.level}` : "";
+    const waiting = urgency ? null : waitingOf(card);
+    const urgencyClass = urgency ? ` urgent-${urgency.level}` : waiting ? ` waiting-${waiting.level}` : "";
     const badge = urgency
       ? `<span class="urgency-badge">${escapeHtml(urgency.label)}</span>`
-      : "";
+      : waiting
+        ? `<span class="urgency-badge" title="応募日・最終更新日から${waiting.days}日、動きがありません。フォロー連絡を検討しましょう">返事待ち ${waiting.days}日</span>`
+        : "";
 
     return `
       <div class="card${urgencyClass}" draggable="true" data-id="${card.id}">

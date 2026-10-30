@@ -240,6 +240,12 @@ button { font-family: inherit; }
 .card.urgent-near { border-color: #E3C77A; background: #FFFBEF; }
 .card.urgent-near .urgency-badge { background: #F6E9BF; color: #7A5F10; }
 
+/* 応募中のまま動きがない案件(返事待ち)は、期限の強調と区別できる青系で表示 */
+.card.waiting-notice { border-color: #B8C2D6; background: #F6F8FC; }
+.card.waiting-notice .urgency-badge { background: #E1E7F3; color: #3F5688; }
+.card.waiting-long { border-color: #6F84B5; background: #EFF3FB; }
+.card.waiting-long .urgency-badge { background: #4A6199; color: #fff; }
+
 .tag {
   align-self: flex-start;
   font-size: 11px;
