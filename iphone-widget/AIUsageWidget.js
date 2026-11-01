@@ -25,6 +25,8 @@ const CONFIG = {
   // Claude の extra_usage の金額がセント単位で返る場合 true (100 で割って表示)
   claudeCreditsInCents: true,
   claudeCurrency: "$",
+  // true: 「残り◯%」を表示 (ChatGPT の画面と同じ) / false: 「使った◯%」を表示
+  showRemaining: true,
   // ブラウザに見せかける User-Agent (Cloudflare に弾かれにくくするため)
   userAgent:
     "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
@@ -468,8 +470,9 @@ function drawBar(pct, base, width, height) {
   ctx.addPath(track);
   ctx.setFillColor(CONFIG.colors.track);
   ctx.fillPath();
-  const w = Math.max(height, (width * pct) / 100);
-  if (pct > 0) {
+  const shown = CONFIG.showRemaining ? 100 - pct : pct;
+  const w = Math.max(height, (width * shown) / 100);
+  if (shown > 0) {
     const fill = new Path();
     fill.addRoundedRect(new Rect(0, 0, w, height), r, r);
     ctx.addPath(fill);
@@ -549,7 +552,10 @@ function renderProvider(col, title, color, result, opts) {
       addText(line, fmtRemain(r.resetsAt), opts.labelSize - 1, CONFIG.colors.sub);
       line.addSpacer(4);
     }
-    addText(line, `${Math.round(r.pct)}%`, opts.labelSize, barColor(r.pct, CONFIG.colors.text), "semibold");
+    const valText = CONFIG.showRemaining
+      ? `残り${Math.round(100 - r.pct)}%`
+      : `${Math.round(r.pct)}%`;
+    addText(line, valText, opts.labelSize, barColor(r.pct, CONFIG.colors.text), "semibold");
     col.addSpacer(2);
     const img = col.addImage(drawBar(r.pct, color, opts.barWidth, opts.barHeight));
     img.imageSize = new Size(opts.barWidth, opts.barHeight);

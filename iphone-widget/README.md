@@ -9,7 +9,7 @@ Claude と ChatGPT(Codex) の利用枠を iPhone のホーム画面に表示す�
 | 週間枠 (モデル別) | `seven_day_opus` / `seven_day_sonnet` など、返ってきたものをすべて表示 | `additional_rate_limits` (例: GPT-5.x-Codex-Spark) |
 | クレジット | 追加利用 (`extra_usage`) の使用額 / 月間上限 | Codex クレジット残高 (`credits.balance`) |
 
-- 使用率 75% 以上で黄色、90% 以上で赤のバーになります。
+- 「残り◯%」で表示します (設定で「使った◯%」にも切替可)。残り 25% 以下で黄色、10% 以下で赤のバーになります。
 - リセットまでの残り時間を表示します。
 - 取得に失敗した場合は前回のデータを ⚠︎ 付きで表示します。
 - ChatGPT 側は **Codex の利用枠** です (chatgpt.com の「Codex → 設定 → 使用状況」と同じデータ)。通常のチャットのメッセージ上限は ChatGPT が公開していないため表示できません。
@@ -67,6 +67,7 @@ PC と iPhone を Apple の「ユニバーサルクリップボード」で連�
 
 スクリプト先頭の `CONFIG` で変更できます。
 
+- `showRemaining`: `true` で「残り◯%」(既定)、`false` で「使った◯%」を表示
 - `refreshMinutes`: 更新間隔 (既定 15分。実際の更新タイミングは iOS が決めます)
 - `claudeCreditsInCents`: Claude の追加利用額がセント単位で返る場合 `true` (既定)。金額が 100 倍/100 分の1 に見える場合は切り替えてください
 - `colors`: 色
