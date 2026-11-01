@@ -366,11 +366,69 @@ async function load(name, fn) {
   try {
     const data = await fn();
     writeCache(name, data);
-    return { data, error: null, stale: false };
+    return { provider: name, data, error: null, stale: false };
   } catch (e) {
     const cached = readCache(name);
-    return { data: cached, error: e.message, stale: !!cached };
+    return { provider: name, data: cached, error: e.message, stale: !!cached };
   }
+}
+
+// ===== ロゴ (初回だけダウンロードして端末に保存) =====
+const LOGO_URLS = {
+  claude: [
+    "https://claude.ai/apple-touch-icon.png",
+    "https://www.google.com/s2/favicons?domain=claude.ai&sz=128",
+  ],
+  chatgpt: [
+    "https://chatgpt.com/apple-touch-icon.png",
+    "https://www.google.com/s2/favicons?domain=chatgpt.com&sz=128",
+  ],
+};
+const LOGOS = {};
+
+async function loadLogo(name) {
+  const p = fm.joinPath(cacheDir, `logo-${name}.png`);
+  if (fm.fileExists(p)) {
+    const img = fm.readImage(p);
+    if (img) return img;
+  }
+  for (const url of LOGO_URLS[name]) {
+    try {
+      const req = new Request(url);
+      req.timeoutInterval = 10;
+      req.headers = { "User-Agent": CONFIG.userAgent };
+      const img = await req.loadImage();
+      if (img && img.size.width >= 16) {
+        fm.writeImage(p, img);
+        return img;
+      }
+    } catch (e) {
+      // 次の候補を試す
+    }
+  }
+  return null; // 取れなければ色付きの ● を表示
+}
+
+async function loadLogos() {
+  const [c, g] = await Promise.all([loadLogo("claude"), loadLogo("chatgpt")]);
+  LOGOS.claude = c;
+  LOGOS.chatgpt = g;
+}
+
+// ===== 自動アップデート =====
+const UPDATE_URL =
+  "https://raw.githubusercontent.com/kyoworking31-cpu/subwork-management/claude/iphone-widget-usage-display-r5ox5l/iphone-widget/AIUsageWidget.js";
+
+async function selfUpdate() {
+  const code = await new Request(UPDATE_URL).loadString();
+  if (!code.includes("AI利用枠ウィジェット")) throw new Error("ダウンロードに失敗しました");
+  const path = module.filename;
+  let ok = false;
+  try {
+    FileManager.iCloud().writeString(path, code);
+    ok = true;
+  } catch (e) {}
+  if (!ok) FileManager.local().writeString(path, code);
 }
 
 // ===== 描画 =====
@@ -449,10 +507,19 @@ function pickRows(rows, max) {
 function renderProvider(col, title, color, result, opts) {
   const head = col.addStack();
   head.centerAlignContent();
-  const dot = head.addText("●");
-  dot.font = Font.systemFont(opts.small ? 8 : 9);
-  dot.textColor = color;
-  head.addSpacer(3);
+  const logo = LOGOS[result.provider];
+  if (logo) {
+    const sz = opts.small ? 13 : 15;
+    const img = head.addImage(logo);
+    img.imageSize = new Size(sz, sz);
+    img.cornerRadius = sz * 0.25;
+    head.addSpacer(5);
+  } else {
+    const dot = head.addText("●");
+    dot.font = Font.systemFont(opts.small ? 8 : 9);
+    dot.textColor = color;
+    head.addSpacer(3);
+  }
   addText(head, title, opts.small ? 11 : 12, CONFIG.colors.text, "bold");
   const plan = result.data && result.data.plan;
   if (plan && !opts.small) {
@@ -506,7 +573,7 @@ function layoutOptions(family) {
     case "extraLarge":
       return { small: false, maxRows: 8, labelSize: 12, rowGap: 6, barWidth: 300, barHeight: 7, showReset: true, showCredits: true };
     default: // medium
-      return { small: false, maxRows: 3, labelSize: 9, rowGap: 3, barWidth: 140, barHeight: 4, showReset: true, showCredits: true };
+      return { small: false, maxRows: 4, labelSize: 9, rowGap: 3, barWidth: 140, barHeight: 4, showReset: true, showCredits: true };
   }
 }
 
@@ -584,6 +651,7 @@ async function setupMenu() {
     a.addAction("ChatGPT の Cookie を設定");
     a.addAction("ChatGPT のアクセストークンを設定 (任意)");
     a.addAction("接続テスト");
+    a.addAction("最新版に更新");
     a.addDestructiveAction("保存した認証情報をすべて削除");
     a.addCancelAction("閉じる");
     const i = await a.presentSheet();
@@ -631,6 +699,14 @@ async function setupMenu() {
           : `${name}: ✓ ${r.data.rows.length}件の枠${r.data.credits ? " / クレジット " + r.data.credits : ""}`;
       await notify("接続テスト", line("Claude", c) + "\n\n" + line("ChatGPT", g));
     } else if (i === 6) {
+      try {
+        await selfUpdate();
+        await notify("更新しました", "スクリプトを閉じて、もう一度開き直してください。");
+        return;
+      } catch (e) {
+        await notify("更新できませんでした", e.message);
+      }
+    } else if (i === 7) {
       Object.values(KEY).forEach(kc.del);
       await notify("削除しました", "Keychain から認証情報を削除しました。");
     }
@@ -640,13 +716,14 @@ async function setupMenu() {
 // ===== エントリーポイント =====
 async function main() {
   const param = (args.widgetParameter || "").trim().toLowerCase();
+  await loadLogos();
 
   if (config.runsInWidget || param === "demo") {
     let claude, chatgpt;
     if (param === "demo") {
       const d = demoData();
-      claude = { data: d.claude, error: null, stale: false };
-      chatgpt = { data: d.chatgpt, error: null, stale: false };
+      claude = { provider: "claude", data: d.claude, error: null, stale: false };
+      chatgpt = { provider: "chatgpt", data: d.chatgpt, error: null, stale: false };
     } else {
       [claude, chatgpt] = await Promise.all([
         load("claude", fetchClaude),
