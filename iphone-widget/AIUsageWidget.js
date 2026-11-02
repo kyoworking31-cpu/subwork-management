@@ -473,8 +473,22 @@ const UPDATE_URL =
   "https://raw.githubusercontent.com/kyoworking31-cpu/subwork-management/claude/iphone-widget-usage-display-r5ox5l/iphone-widget/AIUsageWidget.js";
 
 async function selfUpdate() {
-  // ?t= を付けて GitHub 側のキャッシュ (最大5分) を避ける
-  const code = await new Request(`${UPDATE_URL}?t=${Date.now()}`).loadString();
+  // ブランチ名の URL は GitHub 側で最大5分キャッシュされるため、
+  // 最新コミットの ID を調べて、その版を直接ダウンロードする
+  let url = UPDATE_URL;
+  try {
+    const req = new Request(
+      "https://api.github.com/repos/kyoworking31-cpu/subwork-management/commits/claude/iphone-widget-usage-display-r5ox5l"
+    );
+    req.headers = { Accept: "application/vnd.github+json" };
+    const info = await req.loadJSON();
+    if (info && /^[0-9a-f]{40}$/.test(info.sha || "")) {
+      url = UPDATE_URL.replace("/claude/iphone-widget-usage-display-r5ox5l/", `/${info.sha}/`);
+    }
+  } catch (e) {
+    // 取れなければブランチ名の URL を使う
+  }
+  const code = await new Request(url).loadString();
   if (!code.includes("AI利用枠ウィジェット")) throw new Error("ダウンロードに失敗しました");
   const path = module.filename;
   let ok = false;
