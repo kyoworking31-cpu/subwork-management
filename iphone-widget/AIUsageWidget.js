@@ -168,13 +168,16 @@ function parseClaudeUsage(json) {
           credits = "有効";
         }
       } else {
-        credits = "未使用(オフ)";
+        credits = "オフ";
       }
       continue;
     }
     if (!("utilization" in v)) continue;
     const pct = clampPct(v.utilization);
     if (pct == null) continue;
+    // 公式の使用状況画面に出ない謎の枠 (例: iguana_necktie) は表示しない。
+    // 「seven_day_◯◯」「five_hour_◯◯」形式の新しいモデル別枠だけは表示する。
+    if (!CLAUDE_LABELS[k] && !/^(seven_day|five_hour)_/.test(k)) continue;
     const [label, group] = CLAUDE_LABELS[k] || [prettifyKey(k), "model"];
     rows.push({
       label,
