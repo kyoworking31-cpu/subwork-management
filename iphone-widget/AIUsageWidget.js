@@ -678,6 +678,82 @@ function createWidget(claude, chatgpt, family, isDemo) {
   return w;
 }
 
+// ===== 診断 (データの「形」だけを書き出す。秘密になりうる文字列は伏せる) =====
+function describe(v, indent, depth) {
+  const pad = "  ".repeat(indent);
+  if (v === null) return "null";
+  if (Array.isArray(v)) {
+    if (v.length === 0) return "[] (0件)";
+    if (depth >= 5) return `[${v.length}件]`;
+    if (v.every((x) => x === null || typeof x !== "object")) {
+      return `[${v.length}件] ` + v.slice(0, 10).map((x) => describe(x, indent, depth + 1)).join(", ");
+    }
+    return `[${v.length}件] 先頭:\n${pad}  ` + describe(v[0], indent + 1, depth + 1);
+  }
+  if (typeof v === "object") {
+    if (depth >= 5) return "{…}";
+    const keys = Object.keys(v);
+    if (keys.length === 0) return "{}";
+    return (
+      "{\n" +
+      keys.map((k) => `${pad}  ${k}: ${describe(v[k], indent + 1, depth + 1)}`).join("\n") +
+      `\n${pad}}`
+    );
+  }
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  const str = String(v);
+  if (/^\d{4}-\d{2}-\d{2}T[\d:.]+(Z|[+-][\d:]+)?$/.test(str)) return `"${str}"`; // 日時
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(str)) return "<ID>";
+  const digits = (str.match(/\d/g) || []).length;
+  if (/^[a-z][a-z0-9_.\-]{0,31}$/i.test(str) && digits <= 3 && !/^eyJ/.test(str)) {
+    return `"${str}"`; // 短い英単語 (プラン名・種類など)
+  }
+  return `<文字列 ${str.length}文字>`;
+}
+
+async function diagnose() {
+  const out = [`AI利用枠 診断 ${new Date().toISOString()}`];
+  const add = async (title, fn) => {
+    try {
+      out.push(`\n### ${title}\n` + describe(await fn(), 0, 0));
+    } catch (e) {
+      out.push(`\n### ${title}\n✗ ${e.message}`);
+    }
+  };
+
+  // Claude
+  const cookie = toCookieHeader(kc.get(KEY.claudeCookie), "sessionKey");
+  if (cookie) {
+    const h = { Cookie: cookie, Referer: "https://claude.ai/settings/usage", Origin: "https://claude.ai" };
+    let orgId = null;
+    await add("Claude organizations", async () => {
+      const orgs = await fetchJSON("https://claude.ai/api/organizations", h);
+      const chat = orgs.find((o) => Array.isArray(o.capabilities) && o.capabilities.includes("chat"));
+      orgId = (chat || orgs[0]).uuid;
+      return chat || orgs[0];
+    });
+    if (orgId) {
+      await add("Claude usage", () => fetchJSON(`https://claude.ai/api/organizations/${orgId}/usage`, h));
+    }
+  } else {
+    out.push("\n### Claude\n未設定");
+  }
+
+  // ChatGPT
+  try {
+    const { token, accountId } = await chatgptAccessToken();
+    const h = { Authorization: `Bearer ${token}`, Referer: "https://chatgpt.com/codex/settings/usage" };
+    if (accountId) h["ChatGPT-Account-Id"] = accountId;
+    await add("ChatGPT wham/usage", () => fetchJSON("https://chatgpt.com/backend-api/wham/usage", h));
+    await add("ChatGPT wham/rate-limit-reset-credits", () =>
+      fetchJSON("https://chatgpt.com/backend-api/wham/rate-limit-reset-credits", h)
+    );
+  } catch (e) {
+    out.push(`\n### ChatGPT\n✗ ${e.message}`);
+  }
+  return out.join("\n");
+}
+
 // ===== 設定メニュー (アプリ内で実行したとき) =====
 async function prompt(title, message, placeholder, current) {
   const a = new Alert();
@@ -713,6 +789,7 @@ async function setupMenu() {
     a.addAction("ChatGPT のアクセストークンを設定 (任意)");
     a.addAction("接続テスト");
     a.addAction("最新版に更新");
+    a.addAction("データ構造を診断 (開発用)");
     a.addDestructiveAction("保存した認証情報をすべて削除");
     a.addCancelAction("閉じる");
     const i = await a.presentSheet();
@@ -783,6 +860,14 @@ async function setupMenu() {
         await notify("更新できませんでした", e.message);
       }
     } else if (i === 7) {
+      const text = await diagnose();
+      Pasteboard.copyString(text);
+      await notify(
+        "診断結果をコピーしました",
+        "Claude の会話に貼り付けて送ってください。ログイン情報や ID は含まれていません (数値・はい/いいえ・日時・短い英単語だけです)。"
+      );
+      await QuickLook.present(text, true);
+    } else if (i === 8) {
       Object.values(KEY).forEach(kc.del);
       await notify("削除しました", "Keychain から認証情報を削除しました。");
     }
