@@ -319,7 +319,10 @@ function parseChatGPTUsage(json) {
       credits = isFinite(b) ? `残 ${b.toLocaleString()}` : `残 ${c.balance}`;
     } else if (c.has_credits === false) credits = "なし";
   }
-  return { rows, credits, plan: json.plan_type || null };
+  // 取っておいたリセットの回数
+  const rc = json.rate_limit_reset_credits;
+  const resetCount = rc && rc.available_count != null ? Number(rc.available_count) : null;
+  return { rows, credits, plan: json.plan_type || null, resetCount };
 }
 
 // 保存された値から、試す Cookie ヘッダーの候補を作る
@@ -377,9 +380,35 @@ async function fetchChatGPT() {
   };
   if (accountId) headers["ChatGPT-Account-Id"] = accountId;
   const json = await fetchJSON("https://chatgpt.com/backend-api/wham/usage", headers);
-  const { rows, credits, plan } = parseChatGPTUsage(json);
+  const { rows, credits, plan, resetCount } = parseChatGPTUsage(json);
   if (rows.length === 0 && !credits) throw new Error("利用枠データが空でした");
-  return { provider: "chatgpt", plan, rows, credits, fetchedAt: Date.now() };
+
+  // リセットの回数と、一番早く期限が切れる日
+  let resets = null;
+  if (resetCount != null) {
+    resets = `${resetCount}回`;
+    if (resetCount > 0) {
+      try {
+        const list = await fetchJSON(
+          "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits",
+          headers
+        );
+        const exp = (list.credits || [])
+          .filter((c) => c.status === "available" && c.expires_at)
+          .map((c) => new Date(c.expires_at).getTime())
+          .filter((t) => isFinite(t))
+          .sort((a, b) => a - b)[0];
+        if (exp) {
+          const df = new DateFormatter();
+          df.dateFormat = "M/d";
+          resets += ` (${df.string(new Date(exp))}期限)`;
+        }
+      } catch (e) {
+        // 期限が取れなくても回数だけ表示する
+      }
+    }
+  }
+  return { provider: "chatgpt", plan, rows, credits, resets, fetchedAt: Date.now() };
 }
 
 // ===== デモデータ (ウィジェットのパラメータに demo と入れると表示) =====
@@ -409,6 +438,7 @@ function demoData() {
         { label: "週間 Codex-Spark", pct: 2, resetsAt: now + 100 * h, group: "model" },
       ],
       credits: "残 1,250",
+      resets: "3回 (11/6期限)",
       fetchedAt: now,
     },
   };
@@ -634,6 +664,13 @@ function renderProvider(col, title, color, result, opts) {
     c.addSpacer();
     addText(c, result.data.credits, opts.labelSize, CONFIG.colors.text, "semibold");
   }
+  if (opts.showCredits && result.data.resets) {
+    col.addSpacer(opts.rowGap);
+    const c = col.addStack();
+    addText(c, "リセット", opts.labelSize, CONFIG.colors.sub);
+    c.addSpacer();
+    addText(c, result.data.resets, opts.labelSize, CONFIG.colors.text, "semibold");
+  }
 }
 
 function layoutOptions(family) {
@@ -720,7 +757,8 @@ function describe(v, indent, depth) {
   if (/^\d{4}-\d{2}-\d{2}T[\d:.]+(Z|[+-][\d:]+)?$/.test(str)) return `"${str}"`; // 日時
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(str)) return "<ID>";
   const digits = (str.match(/\d/g) || []).length;
-  if (/^[a-z][a-z0-9_.\-]{0,31}$/i.test(str) && digits <= 3 && !/^eyJ/.test(str)) {
+  const idLike = /^(user|org|acct|account)-/i.test(str) || (/[A-Z]/.test(str) && /[a-z]/.test(str) && str.length >= 12);
+  if (/^[a-z][a-z0-9_.\-]{0,31}$/i.test(str) && digits <= 3 && !/^eyJ/.test(str) && !idLike) {
     return `"${str}"`; // 短い英単語 (プラン名・種類など)
   }
   return `<文字列 ${str.length}文字>`;
