@@ -682,12 +682,27 @@ async function setupMenu() {
       }
     } else if (i === 3) {
       const v = await prompt(
-        "ChatGPT の Cookie",
-        "PCのブラウザで chatgpt.com にログイン → 開発者ツール → Cookies → chatgpt.com の「__Secure-next-auth.session-token」の値を貼り付けてください。\n値が .0 / .1 に分割されている場合は、Network タブのリクエストヘッダー「cookie:」の値全体を貼り付けてください。",
+        "ChatGPT の Cookie (1つ目)",
+        "PCのブラウザの開発者ツール → Cookies → https://chatgpt.com の「__Secure-next-auth.session-token」の値を貼り付けてください。\n.0 / .1 に分かれている場合は、ここに「.0」の値を貼り付けてください。",
         "eyJhbGciOi...",
         ""
       );
-      if (v) kc.set(KEY.chatgptCookie, v);
+      if (v) {
+        const v2 = await prompt(
+          "ChatGPT の Cookie (2つ目)",
+          "「.0」「.1」に分かれていた場合は、ここに「.1」の値を貼り付けて保存してください。\n分かれていなかった場合は、空のまま「保存」を押してください。",
+          "(分かれていなければ空のまま)",
+          ""
+        );
+        const name = "__Secure-next-auth.session-token";
+        if (v.includes("=")) {
+          kc.set(KEY.chatgptCookie, v); // Cookie ヘッダー全体が貼られた場合
+        } else if (v2) {
+          kc.set(KEY.chatgptCookie, `${name}.0=${v}; ${name}.1=${v2}`);
+        } else {
+          kc.set(KEY.chatgptCookie, v);
+        }
+      }
     } else if (i === 4) {
       const v = await prompt(
         "ChatGPT アクセストークン",
