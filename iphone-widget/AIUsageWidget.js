@@ -189,6 +189,19 @@ function parseClaudeUsage(json) {
   return { rows, credits };
 }
 
+// 組織情報からプラン名を推定 (例: "MAX 5x", "PRO")
+function claudePlanName(o) {
+  const caps = Array.isArray(o.capabilities) ? o.capabilities : [];
+  const tier = String(o.rate_limit_tier || "");
+  const mult = (tier.match(/(\d+)x/) || [])[1];
+  if (caps.includes("claude_max") || /max/i.test(tier)) return mult ? `MAX ${mult}x` : "MAX";
+  if (caps.includes("claude_pro") || /pro/i.test(tier)) return "PRO";
+  if (caps.includes("raven") || /team|raven/i.test(tier)) return "TEAM";
+  if (/enterprise/i.test(tier)) return "ENTERPRISE";
+  if (caps.includes("chat")) return "FREE";
+  return null;
+}
+
 async function fetchClaude() {
   const cookie = toCookieHeader(kc.get(KEY.claudeCookie), "sessionKey");
   if (!cookie) throw new Error("未設定 (アプリ内で実行して設定)");
@@ -198,8 +211,14 @@ async function fetchClaude() {
     Origin: "https://claude.ai",
   };
 
-  let org = kc.get(KEY.claudeOrg);
-  if (!org) {
+  // 組織 ID とプラン名は Keychain に覚えておき、1日1回だけ取り直す
+  let saved = null;
+  try {
+    saved = JSON.parse(kc.get(KEY.claudeOrg) || "null");
+  } catch (e) {
+    saved = null; // 旧バージョンの形式 (ID だけ) は取り直す
+  }
+  if (!saved || !saved.uuid || Date.now() - (saved.at || 0) > 24 * 3600 * 1000) {
     const orgs = await fetchJSON("https://claude.ai/api/organizations", headers);
     if (!Array.isArray(orgs) || orgs.length === 0) {
       throw new Error("組織情報を取得できません");
@@ -208,9 +227,11 @@ async function fetchClaude() {
     const chat = orgs.find(
       (o) => Array.isArray(o.capabilities) && o.capabilities.includes("chat")
     );
-    org = (chat || orgs[0]).uuid;
-    kc.set(KEY.claudeOrg, org);
+    const o = chat || orgs[0];
+    saved = { uuid: o.uuid, plan: claudePlanName(o), at: Date.now() };
+    kc.set(KEY.claudeOrg, JSON.stringify(saved));
   }
+  const org = saved.uuid;
 
   let json;
   try {
@@ -222,7 +243,7 @@ async function fetchClaude() {
   }
   const { rows, credits } = parseClaudeUsage(json);
   if (rows.length === 0) throw new Error("利用枠データが空でした");
-  return { provider: "claude", plan: null, rows, credits, fetchedAt: Date.now() };
+  return { provider: "claude", plan: saved.plan, rows, credits, fetchedAt: Date.now() };
 }
 
 // ===== ChatGPT (Codex 利用枠) =====
@@ -368,7 +389,7 @@ function demoData() {
   return {
     claude: {
       provider: "claude",
-      plan: null,
+      plan: "MAX 5x",
       rows: [
         { label: "5時間", pct: 42, resetsAt: now + 2.3 * h, group: "5h" },
         { label: "週間 全モデル", pct: 67, resetsAt: now + 61 * h, group: "week" },
@@ -557,7 +578,7 @@ function renderProvider(col, title, color, result, opts) {
   const plan = result.data && result.data.plan;
   if (plan && !opts.small) {
     head.addSpacer(4);
-    addText(head, plan.toUpperCase(), 9, CONFIG.colors.sub, "semibold");
+    addText(head, plan === plan.toLowerCase() ? plan.toUpperCase() : plan, 9, CONFIG.colors.sub, "semibold");
   }
   head.addSpacer();
   if (result.stale && result.data) {
