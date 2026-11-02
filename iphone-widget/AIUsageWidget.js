@@ -298,13 +298,39 @@ function parseChatGPTUsage(json) {
   return { rows, credits, plan: json.plan_type || null };
 }
 
+// 保存された値から、試す Cookie ヘッダーの候補を作る
+function chatgptCookieCandidates(raw) {
+  const name = "__Secure-next-auth.session-token";
+  const clean = (v) => (v || "").replace(/\s+/g, "");
+  const str = (raw || "").trim().replace(/^cookie:\s*/i, "");
+  if (!str) return { list: [], info: "未設定" };
+
+  // ".0=" と ".1=" に分かれている場合
+  const m0 = str.match(/session-token\.0=([^;]+)/);
+  const m1 = str.match(/session-token\.1=([^;]+)/);
+  if (m0 && m1) {
+    let v0 = clean(m0[1]);
+    let v1 = clean(m1[1]);
+    // 順番を逆に貼った場合は入れ替える (.0 は必ず eyJ で始まる)
+    if (!v0.startsWith("eyJ") && v1.startsWith("eyJ")) [v0, v1] = [v1, v0];
+    return {
+      list: [`${name}.0=${v0}; ${name}.1=${v1}`, `${name}=${v0}${v1}`],
+      info: `分割(.0 ${v0.length}文字 ${v0.startsWith("eyJ") ? "OK" : "先頭が不正"} / .1 ${v1.length}文字)`,
+    };
+  }
+  if (str.includes("=")) return { list: [str], info: `Cookie全体 ${str.length}文字` };
+  const v = clean(str);
+  return {
+    list: [`${name}=${v}`],
+    info: `1つ(${v.length}文字 ${v.startsWith("eyJ") ? "OK" : "先頭が不正"})`,
+  };
+}
+
 async function chatgptAccessToken() {
   const manual = kc.get(KEY.chatgptToken);
-  const cookie = toCookieHeader(
-    kc.get(KEY.chatgptCookie),
-    "__Secure-next-auth.session-token"
-  );
-  if (cookie) {
+  const { list, info } = chatgptCookieCandidates(kc.get(KEY.chatgptCookie));
+  let lastKeys = "";
+  for (const cookie of list) {
     const s = await fetchJSON("https://chatgpt.com/api/auth/session", {
       Cookie: cookie,
       Referer: "https://chatgpt.com/",
@@ -312,10 +338,11 @@ async function chatgptAccessToken() {
     if (s && s.accessToken) {
       return { token: s.accessToken, accountId: s.account ? s.account.id : null };
     }
-    if (!manual) throw new Error("セッション切れ Cookieを再設定してください");
+    lastKeys = Object.keys(s || {}).join(",") || "空";
   }
   if (manual) return { token: manual.replace(/^Bearer\s+/i, ""), accountId: null };
-  throw new Error("未設定 (アプリ内で実行して設定)");
+  if (list.length === 0) throw new Error("未設定 (アプリ内で実行して設定)");
+  throw new Error(`Cookie切れ/不一致 [${info} / 応答:${lastKeys}]`);
 }
 
 async function fetchChatGPT() {
