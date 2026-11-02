@@ -611,7 +611,7 @@ function layoutOptions(family) {
 }
 
 // small / large は縦並び、medium は左右2列
-function createWidget(claude, chatgpt, family) {
+function createWidget(claude, chatgpt, family, isDemo) {
   const w = new ListWidget();
   w.backgroundColor = CONFIG.colors.bg;
   w.refreshAfterDate = new Date(Date.now() + CONFIG.refreshMinutes * 60 * 1000);
@@ -646,7 +646,11 @@ function createWidget(claude, chatgpt, family) {
   w.addSpacer();
   const foot = w.addStack();
   foot.addSpacer();
-  addText(foot, "更新 " + fmtTime(Date.now()), 8, CONFIG.colors.sub);
+  if (isDemo) {
+    addText(foot, "見本データ表示中 (Parameter の demo を消すと実データ)", 8, CONFIG.colors.warn, "semibold");
+  } else {
+    addText(foot, "更新 " + fmtTime(Date.now()), 8, CONFIG.colors.sub);
+  }
   return w;
 }
 
@@ -779,7 +783,7 @@ async function main() {
       ]);
     }
     const family = config.widgetFamily || "medium";
-    const w = createWidget(claude, chatgpt, family);
+    const w = createWidget(claude, chatgpt, family, param === "demo");
     if (config.runsInWidget) Script.setWidget(w);
     else await w.presentMedium();
   } else {
