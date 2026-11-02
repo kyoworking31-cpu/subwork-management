@@ -473,7 +473,8 @@ const UPDATE_URL =
   "https://raw.githubusercontent.com/kyoworking31-cpu/subwork-management/claude/iphone-widget-usage-display-r5ox5l/iphone-widget/AIUsageWidget.js";
 
 async function selfUpdate() {
-  const code = await new Request(UPDATE_URL).loadString();
+  // ?t= を付けて GitHub 側のキャッシュ (最大5分) を避ける
+  const code = await new Request(`${UPDATE_URL}?t=${Date.now()}`).loadString();
   if (!code.includes("AI利用枠ウィジェット")) throw new Error("ダウンロードに失敗しました");
   const path = module.filename;
   let ok = false;
