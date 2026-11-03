@@ -101,7 +101,17 @@ async function fetchJSON(url, headers) {
     if (/cloudflare|cf-chl|Just a moment/i.test(body || "")) {
       throw new Error("Cloudflareにブロックされました");
     }
-    throw new Error(`認証エラー(${status}) Cookieを再設定してください`);
+    // サーバーが返した理由 (例: "permission_error: Invalid authorization") を短く添える
+    let why = "";
+    try {
+      const j = JSON.parse(body);
+      const e = j.error || j.detail || j;
+      why = typeof e === "string" ? e : [e.type, e.message].filter(Boolean).join(": ");
+    } catch (e) {
+      why = (body || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    }
+    why = why ? ` [${why.slice(0, 60)}]` : "";
+    throw new Error(`認証エラー(${status}) Cookieを再設定してください${why}`);
   }
   if (status >= 400) throw new Error(`HTTP ${status}`);
   try {
@@ -197,6 +207,16 @@ function parseClaudeUsage(json) {
   return { rows, credits };
 }
 
+// 値だけ保存されている場合は sessionKey と sessionKeyV3 の両方として送る
+// (claude.ai は両方に同じ値を持っていることがある)
+function claudeCookieHeader() {
+  const raw = (kc.get(KEY.claudeCookie) || "").trim();
+  if (!raw) return null;
+  if (raw.includes("=")) return raw.replace(/^cookie:\s*/i, "");
+  const v = raw.replace(/\s+/g, "");
+  return `sessionKey=${v}; sessionKeyV3=${v}`;
+}
+
 // 組織情報からプラン名を推定 (例: "MAX 5x", "PRO")
 function claudePlanName(o) {
   const caps = Array.isArray(o.capabilities) ? o.capabilities : [];
@@ -211,7 +231,7 @@ function claudePlanName(o) {
 }
 
 async function fetchClaude() {
-  const cookie = toCookieHeader(kc.get(KEY.claudeCookie), "sessionKey");
+  const cookie = claudeCookieHeader();
   if (!cookie) throw new Error("未設定 (アプリ内で実行して設定)");
   const headers = {
     Cookie: cookie,
@@ -789,7 +809,7 @@ async function diagnose() {
   };
 
   // Claude
-  const cookie = toCookieHeader(kc.get(KEY.claudeCookie), "sessionKey");
+  const cookie = claudeCookieHeader();
   if (cookie) {
     const h = { Cookie: cookie, Referer: "https://claude.ai/settings/usage", Origin: "https://claude.ai" };
     let orgId = null;
