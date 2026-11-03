@@ -186,6 +186,14 @@ function parseClaudeUsage(json) {
       group,
     });
   }
+  // リセット直後などで枠が null のときは「まだ使っていない (残り100%)」として表示する
+  const ensure = (key, label, group) => {
+    if (key in (json || {}) && !rows.some((r) => r.group === group)) {
+      rows.push({ label, pct: 0, resetsAt: null, group });
+    }
+  };
+  ensure("five_hour", "5時間", "5h");
+  ensure("seven_day", "週間 全モデル", "week");
   return { rows, credits };
 }
 
@@ -635,6 +643,12 @@ function renderProvider(col, title, color, result, opts) {
     const t = addText(col, result.error || "取得失敗", 10, CONFIG.colors.danger);
     t.lineLimit = 3;
     return;
+  }
+
+  // 最新の取得に失敗してキャッシュを表示中なら、理由を1行だけ出す
+  if (result.stale && result.error) {
+    col.addSpacer(1);
+    addText(col, result.error, 8, CONFIG.colors.warn);
   }
 
   const rows = pickRows(result.data.rows, opts.maxRows);
